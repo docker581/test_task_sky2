@@ -1,8 +1,7 @@
 import asyncio
-import requests
-import time
 from random import shuffle, randint
 
+from aiohttp import ClientSession
 from fastapi import FastAPI
 
 from config import (
@@ -15,46 +14,53 @@ from config import (
 app = FastAPI()
 
 
-def get_data(query: str):
-    data = requests.get(f'http://jsonplaceholder.typicode.com/{query}').json()
-    if data:
-        shuffle(data)
-        return data
-    return {'result': 'wrong query!'}
+async def main(query):
+    async with ClientSession() as session:
+        url = f'http://jsonplaceholder.typicode.com/{query}'
+        async with session.get(url) as response:
+            if response.status != 200:
+                return {'result': 'wrong query!'}
+            data = await response.json()
+            shuffle(data)
+            return data
 
 
 @app.get('/photos/')
 async def photos_list():
-    time.sleep(PHOTOS_LIST_TIME)
-    return get_data('photos')
+    await asyncio.sleep(PHOTOS_LIST_TIME)
+    return await main('photos')
 
 
 @app.get('/photos/{id}')
 async def detail_photo(id: int):
-    time.sleep(DETAIL_PHOTO_TIME)
-    if id not in range(len(get_data('photos'))):
+    await asyncio.sleep(DETAIL_PHOTO_TIME)
+    photos = await main('photos')
+    if id not in range(len(photos)):
         return {'result': 'wrong id!'}
-    return get_data('photos')[id-1]
+    return photos[id]
 
 
 @app.get('/posts')
 async def posts_list():
-    time.sleep(POSTS_LIST_TIME)
-    return get_data('posts')
+    await asyncio.sleep(POSTS_LIST_TIME)
+    return await main('posts')
 
 
 @app.get('/posts/{id}')
 async def detail_post(id: int):
-    time.sleep(DETAIL_POST_TIME)
-    if id not in range(len(get_data('posts'))):
+    await asyncio.sleep(DETAIL_POST_TIME)
+    posts = await main('posts')
+    if id not in range(len(posts)):
         return {'result': 'wrong id!'}
-    return get_data('posts')[id-1]
+    return posts[id]
 
 
 @app.get('/')
 async def home():
-    detail_photo_id = randint(1, len(get_data('photos')))
-    detail_post_id = randint(1, len(get_data('posts')))
+    photos = await main('photos')
+    posts = await main('posts')
+    detail_photo_id = randint(0, len(photos) - 1)
+    detail_post_id = randint(0, len(posts) - 1)
     futures = [
         photos_list(),
         detail_photo(detail_photo_id),
